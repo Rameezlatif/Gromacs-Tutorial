@@ -91,6 +91,8 @@ https://www.ks.uiuc.edu/Development/Download/download.cgi?PackageName=VMD
 arrange them in specific order to avoid errors use 
 perl sort_mol2_bonds.pl LIG.mol2 LIG.mol2 script
 
+or perl sort_mol2_bonds.pl LIG.mol2 sorted_LIG.mol2
+
 3. Go to SwissParam "http://www.swissparam.ch/" and upload the 'Lig.mol2 file'
 4. Download the .zip folder
 5. Again open the best pose ligand with the receptor .pdb file, delete ligand, Perform DockPrep of protein as save it as .pdb file as 'REC.pdb'
