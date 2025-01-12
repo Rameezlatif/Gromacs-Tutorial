@@ -1,0 +1,356 @@
+ 						After Production
+gmx trjconv -s md.tpr -f md.xtc -o whole -pbc whole -ur compact (for whole system (select-0)((contains water, proten and ligands))  % When simulation end, First use this
+
+gmx trjconv -s md.tpr -f whole.xtc -o nojump -pbc nojump -ur compact (for nojump system (select-0))
+
+gmx trjconv -s md.tpr -f nojump.xtc -o rot-trans -fit rot+trans (for whole system (select-0))
+
+gmx trjconv -s md.tpr -f rot-trans.xtc -o rot-trans-ind -n index (protein+ligands) (For rmsd,rmsf gyrate etc)
+
+gmx trjconv -s md.tpr -f rot-trans-ind.xtc  -dump 0 -o 1st.pdb  -n index.ndx 
+
+gmx trjconv -s 1st.pdb -f rot-trans-ind.xtc -fit rot+trans -o rot-trans-2 -skip 100 (For movie and motion analysis, choose 0 for system)
+
+gmx cluster -f md_protein.xtc -s md_protein.tpr -method gromos -cl cluster.pdb -g cluster.log -cutoff 0.2 
+gmx gyrate -f md_protein.xtc -s md_protein.pdb -o gyrate.xvg 
+
+RMSD Analysis
+
+RMSD of Ligand 
+gmx rms -s md.tpr -f md_new.xtc -o rmsd_ligand.xvg
+
+RMSD of protein Ligand Complex
+gmx rms -s MD.tpr -f rot-trans-ind.xtc -o rmsd_complex.xvg -n index.ndx
+
+RMSD of Protein
+gmx rms -s md.tpr -f md_new.xtc -o rmsd_protein.xvg
+
+RMSF 
+gmx rmsf -s em.tpr -f md_new.xtc -o rmsf-protein.xvgxmg
+
+gmx rmsf -s MD.tpr -f rot-trans-ind.xtc -o SIM1_B7_rmsf_res.xvg -res
+
+
+Radius of gyration 
+gmx gyrate -s md.tpr -f md_new.xtc -o gyrate.xvg
+
+Extend Simulation (Simple one) 
+
+gmx mdrun -v -deffnm md_0_10 -cpi md_0_10.cpt -append 
+
+Extend the Simulation
+
+grompp -f new.mdp -c old.tpr -o new.tpr (make a new folder by the name of extension see what files i have included in simulation 1 (50 ns) and than mdrun)
+mdrun -v -s new.tpr -cpi old.cpt -noappend (use -append)
+
+combine 2 XTC files (trajectories files. used when the simulation is run in two instances)
+
+gmx trjcat -f md.xtc traj_comp.part0002.xtc -o combine.xtc
+
+Hydrogen Bond Analysis (Protein-Ligand Complex)
+
+1. Extract the PDB frame from the ns trajectory (0ns or whatever you want) by using the following command  (gmx trjconv -s md.tpr -f rot-trans-ind.xtc  -dump 0 -o 1st.pdb  -n index.ndx -tu ns)
+ 
+
+2. After that open the PDB files in Moe or in any visulizer. In case of Moe, open the file and see the Ligand interaction. Select the Seq viewer and go into the tab protein and than select contacts from the seq menu and select 1 receptor and other ligand and press search.Than see the psotion of the atoms and select those positions one by one in the sequence pane and right click and change the residue color and thickness so that it becomes visible and than select the ribbon pane in the main menue and select the BB and SC due to which contacts becomes visible select the ligand atom that is visually interacting with the residues and click on the name it will show the atom alongwith its number. Than open the PDB file and see the atom number in the corresponding PDB and note that number for example o6 whcih means that oxygen atom at number six. open the PDB file and see the ligand o6 and select the number beside atom. And regarding the protein if your protein has single chain than the residue number is okay just check for any duplication in the PDB file. for example asp621 if asp 621 is unique in the PDB file use this 621. Than create the index file one by one of each interactig residues with the following command of make index (gmx make_ndx -f 1st_0ns.pdb -o 0nsindex.ndx) after that do in console > a (atom number from PDB) and r (residue number eg 621) q save and quit. 
+
+ Extract 1000 frames xtc (gmx trjconv -f rot-trans.xtc -s new.tpr -n index.ndx -o framesmmpbsa.xtc -skip 1000)
+
+Than to find out the distance between the index groups use the following command (gmx mindist -f 1st_0ns.pdb -n 0nsindex.ndx -od 1stinter.xvg -s new.tpr -tu ns) if PDB file is giving an error than use any xtc (trajector file) in place of pdb file. Than visualize it in xmgrace.
+
+MMPBSA
+
+I have calculated MMPBSA from (https://rashmikumari.github.io/g_mmpbsa/single_protein_ligand_binding_energy.html) this website using one step calculation. The required files includes (.ndx, tpr, xtc) and pbsa.mdp. the file pbsa.mdp can be downloaded from the files within the tutorial package. 
+
+In order to calculate the MMPBSA i have to extract the frames 1000 frames and than used the xtc generated to run one step calculaion 
+
+One step calculation g_mmpbsa -f 1EBZ.xtc -s 1EBZ.tpr -n 1EBZ.ndx -i ../pbsa.mdp -pdie 2 -pbsa
+
+Gmx Test command 
+
+
+Free Energy Landsscape (use xvg from gyrate and xvg from rmsd_protein (The script is found in Email and also saved in project file)) 
+
+perl sham.pl -i1 rg-traj.xvg -i2 rmsd-vs-average-concat.xvg -data1 1 -data2 1 -o gsham_input.xvg
+g_sham -f gsham_input.xvg -ls free-energy-landscape.xpm
+python xpm2txt.py -f free-energy-landscape.xpm -o free-energy-landscape.txt
+xpm2ps -f K61A-free-energy-landscape.xpm -o K61A-FEL.eps -rainbow blue
+ps2pdfwr K61A-FEL-ev1-ev2.eps  K61A-FEL.pdf
+
+python get_timestamp.py -f gsham_input.xvg -1 0.657 -2 3.1415
+
+
+  				PCA
+gmx covar -f md_protein.xtc -s md_protein.tpr
+(Selection: "Backbone") 
+
+gmx anaeig -v eigenvec.trr -f md_protein.xtc -eig eigenval.xvg -s md_protein.tpr -first 1 -last 1 -nframes 100 -extr ev1.pdb
+(Selection: Twice "Backbone") 
+
+which produces the PDB file ev1.pdb containing 100 conformations along eigenvector 1. A similar file ev2.pdb can be produced by replacing 1 with 2 in -first 1 and -last 1 . 
+
+ With gmx anaeig one can also calculate the overlap between the principal components and the coordinates of the trajectory:
+
+gmx anaeig -v eigenvec.trr -f md_protein.xtc -eig eigenval.xvg -s md_protein.pdb -first 1 -last 2 -2d 2dproj_ev_1_2.xvg
+(Selection: Twice "Backbone") 
+
+ 				          PCA
+                Use nojump.xtc file
+gmx trjconv -s .tpr -f .xtc -o pca_backbone.xtc          Backbone Trajectory extraction
+
+gmx trjconv -s .tpr -f .xtc -dump 0 -o pca_first.pdb     Backbone Reference extraction
+
+gmx covar -s pca_first.pdb -f pca_backbone.xtc               Covarience
+     
+                 Filtering the motion along one eigen vector
+
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -filt filter1.pdb -first 1 -last 1 -skip 100
+
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -filt filter2.pdb -first 2 -last 2 -skip 100 
+
+                  
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -extr extreme1.pdb -first 1 -last 1 -nframes 30
+
+gmx anaeig -s pca_first.pdb -f backbone.xtc -extr extreme2.pdb -first 2 -last 2 -nframes 30
+
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -proj -first 1 -last 6
+                      
+       		Extraction of euginen vectors for PCA
+
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -proj proj1.xvg -first 1 -last 1 -nframes 30 (you can change the no. of frames) 
+
+gmx anaeig -s pca_first.pdb -f pca_alpha.xtc -proj proj2.xvg -first 2 -last 2 -nframes 30
+                           
+				Mathematica Analysis
+
+perl sham.pl -i1 proj1.xvg -i2 proj2.xvg -data1 1 -data2 1 -o input.xvg
+
+gmx sham -f input.xvg -ls fel329.xpm                {Generation of .xpm file using gmx sham command}
+
+python xmp.py -f fel329.xpm -o fel329.txt           {Generation of .txt file formate to make it readable in Mathematica}
+
+                               Trajectory motion capture Analysis using R
+
+======================="convert xtc to dcd"==============================================.
+chmod 777 wordom_0.22-rc3.i386                                                           .
+./wordom_0.22-rc3.i386 -conv -itrj mytrj.xtc -otrj mytrj.dcd                             .
+                                                                                         . 
+
+============================PCA using R (by me)=================================================
+
+library(bio3d)
+> dcd <- read.dcd("mytrj_eigenvec.dcd")
+path= "/Users/Rameez Hassan/Documents/Ledipasvir dcd"
+file.path (path,"mytrj_eigenvec.dcd")
+> dcd <- read.dcd(file.path (path, "mytrj_eigenvec.dcd"))
+> pdb <- read.pdb(file.path(path, "ev1.pdb"))
+> print(pdb$xyz)
+print(dcd)
+> ca.inds <- atom.select(pdb, elety="CA")
+ xyz <- fit.xyz(fixed=pdb$xyz, mobile=dcd,fixed.inds=ca.inds$xyz,mobile.inds=ca.inds$xyz)
+> pc <- pca.xyz(xyz[,ca.inds$xyz])
+> plot(pc, col=bwr.colors(nrow(xyz)) )
+============================PCA using R =================================================.
+
+library(bio3d)                                                                           .
+dcd <- read.dcd("fit.dcd")                                                               . Reading dcd  and pdb files
+pdb <- read.pdb("N6A-ev1-extreme.pdb")                                                   .
+                                                                                         .
+print(pdb$xyz)                                                                           .
+                                                                                         .
+print(dcd)                                                                               .selecting ca atoms
+                                                                                         .
+ca.inds <- atom.select(pdb, elety="CA")                                                  .
+                                                                                         .
+###inds <- atom.select(dcd, elety="CA")                                                  . fit pdb file in xyz coordinates and fixing CA atoms of dcd traj in xyz coordinate
+                                                                                         .
+xyz <- fit.xyz(fixed=pdb$xyz, mobile=dcd,fixed.inds=ca.inds$xyz,mobile.inds=ca.inds$xyz) .
+                                                                                         .
+pc <- pca.xyz(xyz[,ca.inds$xyz])                                                         .
+plot(pc, col=bwr.colors(nrow(xyz)) )                                                     .
+ 
+####>  plot(pc, col=rainbow(nrow(xyz)) )
+
+dev.print(pdf, 'test.pdf')
+
+
+hc <- hclust(dist(pc$z[, 1:2]))
+grps <- cutree(hc, k=3)
+plot(pc, pc.axes=1:2, col=grps)
+
+
+cij<-dccm(xyz[,ca.inds$xyz])
+plot(cij)
+
+=========================== END R===========================================================
+
+=========================== Plotting XVG files using R==============================================
+
+					Plotting XVG files using R
+
+library(bio3d)
+> library(Peptides)
+> path= "/Users/Rameez Hassan/Documents/Ledipasvir dcd"     
+> xvg <- file.path (path,"2dproj_ev_1_2_remdesivir.xvg")
+> remdesivir <- readXVG(xvg)
+> plot(remdesivir,col=bwr.colors(nrow(xyz)))
+
+===========================================================================================
+		
+		Principal Components Analysis (Pca) With Scikit-Learn
+
+from __future__ import print_function
+%matplotlib inline
+import mdtraj as md
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+traj = md.load('ala2.h5')                                                {load trajectory}                
+traj 
+                                           
+pca1 = PCA(n_components=2)
+traj.superpose(traj, 0)
+
+reduced_cartesian = pca1.fit_transform(traj.xyz.reshape(traj.n_frames, traj.n_atoms * 3))
+print(reduced_cartesian.shape)
+
+
+
+plt.figure()                                                                        {plot the data} 
+plt.scatter(reduced_cartesian[:, 0], reduced_cartesian[:,1], marker='x', c=traj.time)
+plt.xlabel('PC1')
+plt.ylabel('PC2')
+plt.title('Cartesian coordinate PCA: alanine dipeptide')
+cbar = plt.colorbar()
+cbar.set_label('Time [ps]')
+
+
+pca2 = PCA(n_components=2)			                              {cross-checking}
+
+from itertools import combinations
+# this python function gives you all unique pairs of elements from a list
+
+atom_pairs = list(combinations(range(traj.n_atoms), 2))
+pairwise_distances = md.geometry.compute_distances(traj, atom_pairs)
+print(pairwise_distances.shape)
+reduced_distances = pca2.fit_transform(pairwise_distances)
+plt.figure()
+plt.scatter(reduced_distances[:, 0], reduced_distances[:,1], marker='x', c=traj.time)
+plt.xlabel('PC1')
+plt.ylabel('PC2')
+plt.title('Pairwise distance PCA: alanine dipeptide')
+cbar = plt.colorbar()
+cbar.set_label('Time [ps]')
+
+
+ 				Sasa Calculations
+
+from __future__ import print_function
+%matplotlib inline
+import numpy as np
+import mdtraj as md
+
+help(md.shrake_rupley)
+
+trajectory = md.load('ala2.h5')
+sasa = md.shrake_rupley(trajectory)
+
+print(trajectory)
+print('sasa data shape', sasa.shape)
+
+total_sasa = sasa.sum(axis=1)
+print(total_sasa.shape)
+
+from matplotlib.pylab import *
+
+plot(trajectory.time, total_sasa)
+xlabel('Time [ps]', size=16)
+ylabel('Total SASA (nm)^2', size=16)
+show()
+
+def autocorr(x):
+    "Compute an autocorrelation with numpy"
+    x = x - np.mean(x)
+    result = np.correlate(x, x, mode='full')
+    result = result[result.size//2:]
+    return result / result[0]
+
+semilogx(trajectory.time, autocorr(total_sasa))
+xlabel('Time [ps]', size=16)
+ylabel('SASA autocorrelation', size=16)
+show()
+
+			g_mmpbsa Analysis (Binding energy calculations)
+
+Extraction of frames from a specific time range(100 - 150 ns) for g_mmpbsa calculations
+gmx trjconv -f nojump.xtc -s md150.tpr -o 100-150ns.xtc -b 100000 -e 150000 -skip 10 
+Single command
+g_mmpbsa -f 100-150ns.xtc -s md150.tpr -n index.ndx -i mmpbsa.mdp -pbsa -mm energy_MM.xvg -pol polar.xvg -apol apolar.xvg -decomp -mmcon contrb_pol.dat -apcon contrib_apol.dat
+
+	              Individual commands for each energy calculation seperately
+
+g_mmpbsa -f traj.xtc -s topol.tpr -n index.ndx -mme -mm energy_MM.xvg -decomp -mmcon contrib_MM.dat
+g_mmpbsa -f traj.xtc -s topol.tpr -i mmpbsa.mdp -n index.ndx -nomme -pbsa -decomp -pol polar.xvg -pcon contrib_pol.dat
+g_mmpbsa -f traj.xtc -s topol.tpr -i mmpbsa.mdp -n index.ndx -nomme -pbsa -decomp -apol apolar.xvg -apcon contrib_apol.dat
+
+    Final energy calculation
+
+python MmPbSaStat.py -m energy_MM.xvg -p polar.xvg -a apolar.xvg     Generates two files
+ full_energy.dat summary_energy.dat
+
+
+
+		XMGrace
+
+
+How to change from PS to NS
+
+1. Open the respective graphs in xmgrace 
+
+2. Data > TRansformation > Evaluate expression >  select set (if one select one and if two select two) > formula = x=x*0.001 > accept > rightclick on the set (the selected one) > Kill data > OK 
+
+3 Double click on the x axis screen >  stop 100 > label string: ns > Major spacing:20 > apply > acceptx=x
+
+How to change nm to Angstrom
+
+1. y=y*10
+
+
+
+XM Grace How to see the data points in spreadsheet
+
+Plot -> set apperance -> right clik on select set _> edit -> spreadsheet
+
+====================================================
+
+gdrive sync
+
+
+
+
+===============================================================
+
+remove double quotes from text file commands
+
+sed 's/"//g' name_of_file.txt
+
+output the file after double quotes removal
+
+sed 's/"//g' file.txt > outputfile name
+
+
+===============================================================
+Schorindger Software 
+
+You can access as a remote user on  the server using the following login details.
+
+login details
+ssh -X cb@202.30.21.191
+password:123
+
+command for running Schrödinger suite from the terminal.
+$SCHRODINGER/maestro &
+
+Do not forget to make your directory or folder for you work.  
+
+
